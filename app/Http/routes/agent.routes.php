@@ -5,6 +5,8 @@ Route::group(['prefix' => 'agent','middleware' => ['auth', 'agent|salesman'] ], 
 
     Route::get('lead', ['as' => 'agent.lead.index', 'uses' => 'Agent\LeadController@index']);
     Route::get('lead/depostited', ['as' => 'agent.lead.deposited', 'uses' => 'Agent\LeadController@deposited']);
+    Route::get('lead/some-leads', ['as' => 'agent.lead.some-leads', 'uses' => 'Agent\LeadController@someLeads']);
+    Route::get('lead/some-full', ['as' => 'agent.lead.some.full', 'uses' => 'Agent\LeadController@someFull']);
     Route::get('lead/obtain', ['as' => 'agent.lead.obtain', 'uses' => 'Agent\LeadController@obtain']);
     Route::get('lead/obtain/data', ['as' => 'agent.lead.obtain.data', 'uses' => 'Agent\LeadController@obtainData']);
     Route::get('lead/open/{id}', ['as' => 'agent.lead.open', 'uses' => 'Agent\LeadController@openLead']);

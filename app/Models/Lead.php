@@ -12,9 +12,10 @@ use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 
 #class Lead extends EloquentUser implements AuthenticatableContract, CanResetPasswordContract {
 #    use Authenticatable, CanResetPassword;
-class Lead extends EloquentUser {
+class Lead extends EloquentUser
+{
 
-    protected $table="leads";
+    protected $table = "leads";
 
     /**
      * The attributes that are mass assignable.
@@ -22,7 +23,7 @@ class Lead extends EloquentUser {
      * @var array
      */
     protected $fillable = [
-        'agent_id','sphere_id','name', 'customer_id', 'comment', 'date', 'bad'
+        'agent_id', 'sphere_id', 'name', 'customer_id', 'comment', 'date', 'bad'
     ];
 
     /**
@@ -34,20 +35,29 @@ class Lead extends EloquentUser {
     #    'password', 'remember_token',
     #];
 
-    public function sphere(){
+    public function sphere()
+    {
         return $this->hasOne('App\Models\Sphere', 'id', 'sphere_id');
     }
 
-    public function info(){
-        return $this->hasMany('App\Models\LeadInfoEAV','lead_id','id');
+    public function info()
+    {
+        return $this->hasMany('App\Models\LeadInfoEAV', 'lead_id', 'id');
     }
 
-    public function phone(){
-        return $this->hasOne('App\Models\Customer','id','customer_id');
+    public function phone()
+    {
+        return $this->hasOne('App\Models\Customer', 'id', 'customer_id');
     }
 
-    public function obtainedBy($agent_id=NULL){
-        $relation=$this->belongsToMany('App\Models\Agent','open_leads','lead_id','agent_id');
-        return ($agent_id)? $relation->where('agent_id','=',$agent_id) : $relation;
+    public function obtainedBy($agent_id = NULL)
+    {
+        $relation = $this->belongsToMany('App\Models\Agent', 'open_leads', 'lead_id', 'agent_id');
+        return ($agent_id) ? $relation->where('agent_id', '=', $agent_id) : $relation;
+    }
+
+    public function sphereAttributes()
+    {
+        return $this->hasMany('App\Models\SphereAttr', 'sphere_id', 'sphere_id')->with('options');
     }
 }

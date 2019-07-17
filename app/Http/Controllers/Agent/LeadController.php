@@ -16,111 +16,116 @@ use Illuminate\Support\Facades\Input;
 //use App\Http\Requests\Admin\ArticleRequest;
 use Datatables;
 
-class LeadController extends AgentController {
-     /*
-    * Display a listing of the resource.
-    *
-    * @return Response
-    */
+class LeadController extends AgentController
+{
+    /*
+   * Display a listing of the resource.
+   *
+   * @return Response
+   */
     public function index()
     {
         // Show the page
         return view('agent.lead.index');
     }
 
-    public function deposited(){
+    public function deposited()
+    {
         $leads = $this->user->leads()->with('phone')->get();
-        return view('agent.lead.deposited')->with('leads',$leads);
+        return view('agent.lead.deposited')->with('leads', $leads);
     }
 
-    public function obtain(){
+    public function obtain()
+    {
         $agent = $this->user;
-        $mask=$this->mask;
+        $mask = $this->mask;
 
         $list = $mask->obtain()->skip(0)->take(10);
-        $leads = Lead::with('obtainedBy')->whereIn('id',$list->lists('user_id'))->get();
+        $leads = Lead::with('obtainedBy')->whereIn('id', $list->lists('user_id'))->get();
         $lead_attr = $agent->sphere()->leadAttr()->get();
         return view('agent.lead.obtain')
-            ->with('leads',$leads)
-            ->with('lead_attr',$lead_attr)
-            ->with('filter',$list->get());
+            ->with('leads', $leads)
+            ->with('lead_attr', $lead_attr)
+            ->with('filter', $list->get());
     }
 
     public function obtainData(Request $request)
     {
         $agent = $this->user;
-        $mask=$this->mask;
+        $mask = $this->mask;
 
         $list = $mask->obtain();
         $leads = Lead::whereIn('id', $list->lists('user_id'))
-            ->where('leads.agent_id','<>',$this->uid)
+            ->where('leads.agent_id', '<>', $this->uid)
             ->select(['leads.opened', 'leads.id', 'leads.updated_at', 'leads.name', 'leads.customer_id', 'leads.email']);
         if (count($request->only('filter'))) {
             $eFilter = $request->only('filter')['filter'];
             foreach ($eFilter as $eFKey => $eFVal) {
-                switch($eFKey) {
+                switch ($eFKey) {
                     case 'date':
-                        if($eFVal=='2d') {
+                        if ($eFVal == '2d') {
                             $date = new \DateTime();
                             $date->sub(new \DateInterval('P2D'));
-                            $leads->where('leads.updated_at','>=',$date->format('Y-m-d'));
-                        } elseif($eFVal=='1m') {
+                            $leads->where('leads.updated_at', '>=', $date->format('Y-m-d'));
+                        } elseif ($eFVal == '1m') {
                             $date = new \DateTime();
                             $date->sub(new \DateInterval('P1M'));
-                            $leads->where('leads.updated_at','>=',$date->format('Y-m-d'));
+                            $leads->where('leads.updated_at', '>=', $date->format('Y-m-d'));
                         } else {
 
                         }
                         break;
-                    default: ;
+                    default:
+                        ;
                 }
             }
         }
 
         $datatable = Datatables::of($leads)
-            ->edit_column('opened',function($model){
-                return view('agent.lead.datatables.obtain_count',['opened'=>$model->opened]);
+            ->edit_column('opened', function ($model) {
+                return view('agent.lead.datatables.obtain_count', ['opened' => $model->opened]);
             })
-            ->edit_column('id',function($model){
-                return view('agent.lead.datatables.obtain_open',['lead'=>$model]);
+            ->edit_column('id', function ($model) {
+                return view('agent.lead.datatables.obtain_open', ['lead' => $model]);
             })
-            ->edit_column('status',function($model){
+            ->edit_column('status', function ($model) {
                 return '';
             })
-            ->edit_column('customer_id',function($lead) use ($agent){
-                return ($lead->obtainedBy($agent->id)->count())?$lead->phone->phone:trans('lead.hidden');
+            ->edit_column('customer_id', function ($lead) use ($agent) {
+                return ($lead->obtainedBy($agent->id)->count()) ? $lead->phone->phone : trans('lead.hidden');
             })
-            ->edit_column('email',function($lead) use ($agent){
-                return ($lead->obtainedBy($agent->id)->count())?$lead->email:trans('lead.hidden');
+            ->edit_column('email', function ($lead) use ($agent) {
+                return ($lead->obtainedBy($agent->id)->count()) ? $lead->email : trans('lead.hidden');
             });
         $lead_attr = $agent->sphere()->leadAttr()->get();
-        foreach($lead_attr as $key=>$l_attr){
-           $datatable->add_column('a_'.$key,function($lead) use ($l_attr){
-                $val = $lead->info()->where('key','=',$l_attr->id)->first();
-                return view('agent.lead.datatables.obtain_data',['data'=>$val,'type'=>$l_attr->_type]);
-           });
+        foreach ($lead_attr as $key => $l_attr) {
+            $datatable->add_column('a_' . $key, function ($lead) use ($l_attr) {
+                $val = $lead->info()->where('key', '=', $l_attr->id)->first();
+                return view('agent.lead.datatables.obtain_data', ['data' => $val, 'type' => $l_attr->_type]);
+            });
         }
         return $datatable->make();
     }
 
-    public function openLead($id){
+    public function openLead($id)
+    {
         $agent = $this->user;
         $agent->load('bill');
-        $credit = Credits::where('agent_id','=',$this->uid)->sharedLock()->first();
+        $credit = Credits::where('agent_id', '=', $this->uid)->sharedLock()->first();
         $balance = $credit->balance;
 
-        $mask=$this->mask;
+        $mask = $this->mask;
         $price = $mask->findMask()->sharedLock()->first()->lead_price;
 
-        if($price > $balance) {
-            return redirect()->route('agent.lead.obtain',[0]);
+        if ($price > $balance) {
+            return redirect()->route('agent.lead.obtain', [0]);
         }
 
         $lead = Lead::lockForUpdate()->find($id);
-        if($lead->sphere->openLead > $lead->opened) {
+        if ($lead->sphere->openLead > $lead->opened) {
             $lead->obtainedBy()->attach($this->uid);
-            $lead->opened+=1;
-            $credit->payment=$price;
+            $lead->opened += 1;
+            $credit->payment = $price;
             $credit->save();
             //$credit->history()->save(new CreditHistory());
         }
@@ -136,8 +141,8 @@ class LeadController extends AgentController {
      */
     public function create()
     {
-        $spheres = Sphere::active()->lists('name','id');
-        return view('agent.lead.create')->with('lead',[])->with('spheres',$spheres);
+        $spheres = Sphere::active()->lists('name', 'id');
+        return view('agent.lead.create')->with('lead', [])->with('spheres', $spheres);
     }
 
     /**
@@ -151,10 +156,10 @@ class LeadController extends AgentController {
             'phone' => 'required|regex:/\(?([0-9]{3})\)?([\s.-])*([0-9]{3})([\s.-])*([0-9]{4})/',
             'name' => 'required'
         ]);
-        $agent =  $this->user;
+        $agent = $this->user;
 
         if ($validator->fails() || !$agent->sphere()) {
-            if($request->ajax()){
+            if ($request->ajax()) {
                 return response()->json($validator);
             } else {
                 return redirect()->back()->withErrors($validator)->withInput();
@@ -162,15 +167,15 @@ class LeadController extends AgentController {
         }
 
 
-        $customer = Customer::firstOrCreate(['phone'=>preg_replace('/[^\d]/','',$request->input('phone'))]);
+        $customer = Customer::firstOrCreate(['phone' => preg_replace('/[^\d]/', '', $request->input('phone'))]);
 
         $lead = new Lead($request->except('phone'));
-        $lead->customer_id=$customer->id;
-        $lead->date=date('Y-m-d');
+        $lead->customer_id = $customer->id;
+        $lead->date = date('Y-m-d');
 
         $agent->leads()->save($lead);
 
-        if($request->ajax()){
+        if ($request->ajax()) {
             return response()->json();
         } else {
             return redirect()->route('agent.lead.index');
@@ -189,6 +194,24 @@ class LeadController extends AgentController {
         return response()->route('agent.lead.index');
     }
 
+    public function someLeads()
+    {
+        $agent = $this->user;
+        $leads = $agent->leads()->with('phone')->get();
+        return view('agent.lead.some')
+            ->with('leads', $leads);
+    }
+
+    public function someFull(Request $request)
+    {
+        $agent = $this->user;
+        $lead = $agent->leads()->where(['id' => $request->itemId])->with('phone', 'sphereAttributes')->first();
+//        echo "<pre>";
+//        print_r($lead);
+//        echo "</pre>";
+        return view('agent.lead.some-full')
+            ->with('lead', $lead);
+    }
 
 
 }
